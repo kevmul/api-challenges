@@ -1,22 +1,58 @@
 package todo
 
 import (
+	"api-challenges/internal/helpers"
 	"encoding/json"
 	"log"
 	"net/http"
 )
 
-func GetTodos(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+type TodoHandler struct {
+	service *TodoService
+}
 
-	todos, err := getAll()
+func NewTodoHandler(service *TodoService) *TodoHandler {
+	return &TodoHandler{
+		service: service,
+	}
+}
+
+// GetTodos handles the GET /todos/ endpoint and
+// returns a list of todos in JSON format.
+func (h *TodoHandler) GetTodos(w http.ResponseWriter, r *http.Request) {
+	todos, err := h.service.getAll()
 	if err != nil {
 		log.Printf("error getting todos: %s", err)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(todos); err != nil {
-		log.Printf("error encoding json: %s", err)
+	helpers.WriteJson(w, http.StatusOK, todos)
+}
+
+type CreateTodoRequest struct {
+	Title string `json:"title"`
+}
+
+// Create a new todo item and return it in JSON format.
+func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
+	var req CreateTodoRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("error decoding json: %s", err)
+		return
 	}
+
+	if req.Title == "" {
+		log.Printf("error: title is required")
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+
+	todo, err := h.service.create(req.Title)
+	if err != nil {
+		log.Printf("error creating todo: %s", err)
+		return
+	}
+
+	helpers.WriteJson(w, http.StatusCreated, todo)
 }

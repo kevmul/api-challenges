@@ -4,6 +4,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"api-challenges/internal/todo"
 )
 
 type application struct {
@@ -13,9 +15,11 @@ type application struct {
 func (app *application) mount() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /todos/", func() {
-		return
-	})
+	service := todo.NewTodoService()
+	handler := todo.NewTodoHandler(service)
+	mux.HandleFunc("GET /todos/", handler.GetTodos)
+	mux.HandleFunc("POST /todos/", handler.CreateTodo)
+
 	return mux
 }
 
