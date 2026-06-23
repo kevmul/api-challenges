@@ -87,3 +87,52 @@ func TestDestroy(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Len(t, s.Todos, 1)
 }
+
+func Test_todoService_Update(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		id          int
+		updatedTodo Todo
+		want        Todo
+		wantErr     bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "update existing todo",
+			id:   1,
+			updatedTodo: Todo{
+				Title: "Updated Title",
+				Done:  true,
+			},
+			want: Todo{
+				ID:    1,
+				Title: "Updated Title",
+				Done:  true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "update non-existing todo",
+			id:   999,
+			updatedTodo: Todo{
+				Title: "Updated Title",
+				Done:  true,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewTodoService()
+			got, gotErr := s.Update(tt.id, tt.updatedTodo)
+			if tt.wantErr {
+				assert.NotNil(t, gotErr)
+				assert.Equal(t, ErrNotFound, gotErr)
+			} else {
+				assert.Nil(t, gotErr)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}

@@ -19,6 +19,7 @@ type TodoService interface {
 	GetAll() ([]Todo, error)
 	GetById(id int) (Todo, error)
 	Create(todoTitle string) (Todo, error)
+	Update(id int, updatedTodo Todo) (Todo, error)
 	Destroy(id int) error
 }
 
@@ -87,7 +88,13 @@ func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJson(w, http.StatusCreated, todo)
 }
 
-func (s *TodoHandler) DestroyTodo(w http.ResponseWriter, r *http.Request) {
+type PatchTodoRequest struct {
+	Title string `json:"title"`
+	Done  bool   `json:"done"`
+}
+
+// UpdateTodo handles the PATCH /todos/{id} endpoint and updates a todo item.
+func (h *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
@@ -95,9 +102,50 @@ func (s *TodoHandler) DestroyTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo, _ := s.service.GetById(id)
+	var req PatchTodoRequest
 
-	err = s.service.Destroy(id)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("error decoding json: %s", err)
+		return
+	}
+
+	if req.Title == "" {
+		log.Printf("error: title is required")
+		http.Error(w, "title is required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("updating todo with id: %d and title: %s", id, req.Title)
+
+	_, err = h.service.GetById(id)
+	if err != nil {
+		log.Printf("error getting todo by id: %s", err)
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+
+	response, err := h.service.Update(id, Todo{ID: id, Title: req.Title, Done: req.Done})
+	if err != nil {
+		log.Printf("error updating todo: %s", err)
+		http.Error(w, "error updating todo", http.StatusInternalServerError)
+		return
+	}
+
+	helpers.WriteJson(w, http.StatusOK, response)
+}
+
+// DestroyTodo handles the DELETE /todos/{id} endpoint and
+func (h *TodoHandler) DestroyTodo(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		log.Print("id invalid. Must be an integeger")
+		http.Error(w, "invalid id. ID Must be an integer", http.StatusBadRequest)
+		return
+	}
+
+	todo, _ := h.service.GetById(id)
+
+	err = h.service.Destroy(id)
 	if err != nil {
 		log.Printf("could not delete todo: %s", todo.Title)
 	}

@@ -2,6 +2,7 @@ package todo
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -132,6 +133,73 @@ func TestTodoHandler_GetTodo(t *testing.T) {
 				assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 				assert.Nil(t, err)
 				assert.JSONEq(t, rec.Body.String(), `{"id" : 1, "title": "Learn net/http", "done": false}`)
+			}
+		})
+	}
+}
+
+func TestTodoHandler_UpdateTodo(t *testing.T) {
+	tests := []struct {
+		name    string // description of this test case
+		id      int
+		request string
+		errCode int
+		err     error
+		wantErr bool
+	}{
+		{
+			name:    "update existing todo",
+			id:      1,
+			request: `{"title": "Updated Todo"}`,
+			errCode: http.StatusOK,
+			err:     nil,
+			wantErr: false,
+		},
+		{
+			name:    "update non-existing todo",
+			id:      999,
+			request: `{"title": "Should Not Exist"}`,
+			errCode: http.StatusNotFound,
+			err:     ErrNotFound,
+			wantErr: true,
+		},
+		{
+			name:    "update with empty title",
+			id:      1,
+			request: `{"title": ""}`,
+			errCode: http.StatusBadRequest,
+			err:     errors.New("title is required"),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewTodoService()
+			h := NewTodoHandler(svc)
+
+			// Convert the integer ID to a string for the request URL
+			id := strconv.Itoa(tt.id)
+
+			body := strings.NewReader(tt.request)
+			req := httptest.NewRequest(http.MethodPatch, "/todos/"+id, body)
+			req.SetPathValue("id", id) // manually inject what the mux would have set
+			rec := httptest.NewRecorder()
+
+			h.UpdateTodo(rec, req)
+
+			var got Todo
+
+			err := json.Unmarshal(rec.Body.Bytes(), &got)
+
+			if tt.wantErr {
+				assert.NotNil(t, err)
+				assert.Equal(t, tt.errCode, rec.Code)
+				assert.Equal(t, tt.err.Error(), strings.TrimSpace(rec.Body.String()))
+			} else {
+				assert.Equal(t, http.StatusOK, rec.Code)
+				assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+				assert.Nil(t, err)
+				assert.JSONEq(t, `{"id" : 1, "title": "Updated Todo", "done": false}`, rec.Body.String())
 			}
 		})
 	}

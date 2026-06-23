@@ -57,6 +57,18 @@ func (s *todoService) Create(todoTitle string) (Todo, error) {
 	return todo, nil
 }
 
+func (s *todoService) Update(id int, updatedTodo Todo) (Todo, error) {
+	for i, todo := range s.Todos {
+		if todo.ID == id {
+			s.Todos[i].Title = updatedTodo.Title
+			s.Todos[i].Done = updatedTodo.Done
+			return s.Todos[i], nil
+		}
+	}
+
+	return Todo{}, ErrNotFound
+}
+
 func (s *todoService) Destroy(id int) error {
 	s.Todos = slices.DeleteFunc(s.Todos, func(t Todo) bool {
 		return t.ID == id
