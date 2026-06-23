@@ -8,7 +8,7 @@ import (
 
 func TestGetAll(t *testing.T) {
 	s := NewTodoService()
-	todos, err := s.getAll()
+	todos, err := s.GetAll()
 
 	assert.Nil(t, err, "getAll should not return an error")
 	assert.Len(t, todos, 2, "getAll should return 2 todos")
@@ -36,7 +36,7 @@ func TestGetByID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewTodoService()
-			todo, err := s.getById(tt.id)
+			todo, err := s.GetById(tt.id)
 			if tt.wantErr {
 				assert.NotNil(t, err)
 				assert.Equal(t, ErrNotFound, err)
@@ -63,7 +63,7 @@ func Test_create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := NewTodoService()
 			assert.Len(t, s.Todos, 2, "Initial number of todos should be 2")
-			todo, err := s.create(tt.todoTitle)
+			todo, err := s.Create(tt.todoTitle)
 			assert.Nil(t, err, "create should not return an error")
 			assert.Equal(t, tt.todoTitle, todo.Title)
 			assert.False(t, todo.Done, "Newly created todo should not be done")
@@ -74,9 +74,9 @@ func Test_create(t *testing.T) {
 func TestCreateTodoIncrementsID(t *testing.T) {
 	// Create a new todo and check if the ID is incremented correctly.
 	s := NewTodoService()
-	newTodo, err := s.create("Another Todo")
+	newTodo, err := s.Create("Another Todo")
 	assert.Nil(t, err, "create should not return an error")
 	assert.Equal(t, 3, newTodo.ID, "Newly created todo should have ID 3")
-	todos, _ := s.getAll()
+	todos, _ := s.GetAll()
 	assert.Len(t, todos, 3, "There should now be 3 todos in total")
 }

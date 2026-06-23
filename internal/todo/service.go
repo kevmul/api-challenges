@@ -2,12 +2,7 @@ package todo
 
 import "errors"
 
-//	type TodoService interface {
-//		GetAll() ([]Todo, error)
-//		GetByID(id int) (Todo, error)
-//		Create(todoTitle string) (Todo, error)
-//	}
-type TodoService struct {
+type todoService struct {
 	Todos []Todo
 }
 
@@ -19,8 +14,8 @@ type Todo struct {
 
 var ErrNotFound = errors.New("todo not found")
 
-func NewTodoService() *TodoService {
-	return &TodoService{
+func NewTodoService() *todoService {
+	return &todoService{
 		Todos: []Todo{
 			{ID: 1, Title: "Learn net/http", Done: false},
 			{ID: 2, Title: "Learn JSON encoding", Done: false},
@@ -28,14 +23,14 @@ func NewTodoService() *TodoService {
 	}
 }
 
-func (s *TodoService) getAll() ([]Todo, error) {
+func (s *todoService) GetAll() ([]Todo, error) {
 	if len(s.Todos) == 0 {
 		return nil, ErrNotFound
 	}
 	return s.Todos, nil
 }
 
-func (s *TodoService) getById(id int) (Todo, error) {
+func (s *todoService) GetById(id int) (Todo, error) {
 
 	for _, todo := range s.Todos {
 		if todo.ID == id {
@@ -46,7 +41,7 @@ func (s *TodoService) getById(id int) (Todo, error) {
 	return Todo{}, ErrNotFound
 }
 
-func (s *TodoService) create(todoTitle string) (Todo, error) {
+func (s *todoService) Create(todoTitle string) (Todo, error) {
 
 	todo := Todo{
 		ID:    len(s.Todos) + 1,

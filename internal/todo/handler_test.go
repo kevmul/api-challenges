@@ -30,7 +30,7 @@ func TestGetTodos(t *testing.T) {
 }
 
 func TestGetTodosHandler_Empty(t *testing.T) {
-	svc := &TodoService{Todos: []Todo{}} // explicitly empty
+	svc := &todoService{Todos: []Todo{}} // explicitly empty
 	h := NewTodoHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/todos", nil)
