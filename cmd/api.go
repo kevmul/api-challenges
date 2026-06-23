@@ -18,6 +18,7 @@ func (app *application) mount() http.Handler {
 	service := todo.NewTodoService()
 	handler := todo.NewTodoHandler(service)
 	mux.HandleFunc("GET /todos/", handler.GetTodos)
+	mux.HandleFunc("GET /todos/{id}", handler.GetTodo)
 	mux.HandleFunc("POST /todos/", handler.CreateTodo)
 	mux.HandleFunc("DELETE /todos/{id}", handler.DestroyTodo)
 

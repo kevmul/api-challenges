@@ -44,6 +44,25 @@ type CreateTodoRequest struct {
 	Title string `json:"title"`
 }
 
+// Get a single todo item by ID and return it in JSON format.
+func (h *TodoHandler) GetTodo(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		log.Print("id invalid. Must be an integeger")
+		http.Error(w, "invalid id. ID Must be an integer", http.StatusBadRequest)
+		return
+	}
+
+	todo, err := h.service.GetById(id)
+	if err != nil {
+		log.Printf("error getting todo by id: %s", err)
+		http.Error(w, "todo not found", http.StatusNotFound)
+		return
+	}
+
+	helpers.WriteJson(w, http.StatusOK, todo)
+}
+
 // Create a new todo item and return it in JSON format.
 func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	var req CreateTodoRequest
