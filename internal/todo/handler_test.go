@@ -42,6 +42,8 @@ func TestGetTodosHandler_Empty(t *testing.T) {
 	assert.Equal(t, "", strings.TrimSpace(rec.Body.String()))
 }
 
+func TestGetTodoById(t *testing.T) {}
+
 func TestCreateTodo(t *testing.T) {
 	svc := NewTodoService()
 	h := NewTodoHandler(svc)
@@ -59,4 +61,22 @@ func TestCreateTodo(t *testing.T) {
 	err := json.Unmarshal(rec.Body.Bytes(), &got)
 	assert.Nil(t, err)
 	assert.Equal(t, "New Todo", got.Title)
+}
+
+func TestDestroyTodo(t *testing.T) {
+	svc := NewTodoService()
+	h := NewTodoHandler(svc)
+
+	req := httptest.NewRequest(http.MethodDelete, "/todos/1", nil)
+	req.SetPathValue("id", "1") // manually inject what the mux would have set
+	rec := httptest.NewRecorder()
+
+	h.DestroyTodo(rec, req)
+
+	var got Todo
+	err := json.Unmarshal(rec.Body.Bytes(), &got)
+	assert.Nil(t, err)
+	assert.JSONEq(t, rec.Body.String(), `{"deleted": {"id" : 1, "title": "Learn net/http", "done": false}}`)
+
+	assert.Len(t, svc.Todos, 1)
 }

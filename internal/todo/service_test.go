@@ -80,3 +80,10 @@ func TestCreateTodoIncrementsID(t *testing.T) {
 	todos, _ := s.GetAll()
 	assert.Len(t, todos, 3, "There should now be 3 todos in total")
 }
+
+func TestDestroy(t *testing.T) {
+	s := NewTodoService()
+	err := s.Destroy(1)
+	assert.Nil(t, err)
+	assert.Len(t, s.Todos, 1)
+}

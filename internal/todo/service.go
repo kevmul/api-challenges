@@ -1,6 +1,9 @@
 package todo
 
-import "errors"
+import (
+	"errors"
+	"slices"
+)
 
 type todoService struct {
 	Todos []Todo
@@ -52,4 +55,12 @@ func (s *todoService) Create(todoTitle string) (Todo, error) {
 	s.Todos = append(s.Todos, todo)
 
 	return todo, nil
+}
+
+func (s *todoService) Destroy(id int) error {
+	s.Todos = slices.DeleteFunc(s.Todos, func(t Todo) bool {
+		return t.ID == id
+	})
+
+	return nil
 }

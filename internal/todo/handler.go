@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 type TodoHandler struct {
@@ -18,6 +19,7 @@ type TodoService interface {
 	GetAll() ([]Todo, error)
 	GetById(id int) (Todo, error)
 	Create(todoTitle string) (Todo, error)
+	Destroy(id int) error
 }
 
 func NewTodoHandler(service TodoService) *TodoHandler {
@@ -64,4 +66,28 @@ func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helpers.WriteJson(w, http.StatusCreated, todo)
+}
+
+func (s *TodoHandler) DestroyTodo(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		log.Print("id invalid. Must be an integeger")
+		http.Error(w, "invalid id. ID Must be an integer", http.StatusBadRequest)
+		return
+	}
+
+	todo, _ := s.service.GetById(id)
+
+	err = s.service.Destroy(id)
+	if err != nil {
+		log.Printf("could not delete todo: %s", todo.Title)
+	}
+
+	type DeletedResponse struct {
+		Deleted Todo `json:"deleted"`
+	}
+
+	response := DeletedResponse{Deleted: todo}
+
+	helpers.WriteJson(w, http.StatusOK, response)
 }
