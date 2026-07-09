@@ -162,7 +162,7 @@ func (h *TodoHandler) UpdateTodo(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{"updated": response})
 }
 
 // DestroyTodo handles the DELETE /todos/{id} endpoint and
