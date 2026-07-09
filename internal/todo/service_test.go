@@ -136,3 +136,55 @@ func Test_todoService_Update(t *testing.T) {
 		})
 	}
 }
+
+func Test_todoService_Patch(t *testing.T) {
+	tests := []struct {
+		name    string // Name of the test
+		id      int
+		want    Todo
+		wantErr bool
+	}{
+		{
+			name: "Toggle status to true",
+			id:   1,
+			want: Todo{
+				ID:    1,
+				Title: "Test Todo Not Done",
+				Done:  true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test Todo Is Done",
+			id:   2,
+			want: Todo{
+				ID:    2,
+				Title: "Test Todo Is Done",
+				Done:  false,
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Todo doesn't exist",
+			id:      3,
+			want:    Todo{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &todoService{Todos: []Todo{
+				{ID: 1, Title: "Test Todo Not Done", Done: false},
+				{ID: 2, Title: "Test Todo Is Done", Done: true},
+			}}
+			got, gotErr := s.Patch(tt.id)
+			if tt.wantErr {
+				assert.NotNil(t, gotErr)
+				assert.Equal(t, ErrNotFound, gotErr)
+			} else {
+				assert.Nil(t, gotErr)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
