@@ -1,11 +1,12 @@
 package todo
 
 import (
-	"api-challenges/internal/helpers"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 type TodoHandler struct {
@@ -20,6 +21,7 @@ type TodoService interface {
 	GetById(id int) (Todo, error)
 	Create(todoTitle string) (Todo, error)
 	Update(id int, updatedTodo Todo) (Todo, error)
+	Patch(id int) (Todo, error)
 	Destroy(id int) error
 }
 
@@ -31,14 +33,14 @@ func NewTodoHandler(service TodoService) *TodoHandler {
 
 // GetTodos handles the GET /todos/ endpoint and
 // returns a list of todos in JSON format.
-func (h *TodoHandler) GetTodos(w http.ResponseWriter, r *http.Request) {
+func (h *TodoHandler) GetTodos(c *gin.Context) {
 	todos, err := h.service.GetAll() // This is the error
 	if err != nil {
 		log.Printf("error getting todos: %s", err)
 		return
 	}
 
-	helpers.WriteJson(w, http.StatusOK, todos)
+	c.JSON(http.StatusOK, todos)
 }
 
 type CreateTodoRequest struct {
@@ -46,46 +48,74 @@ type CreateTodoRequest struct {
 }
 
 // Get a single todo item by ID and return it in JSON format.
-func (h *TodoHandler) GetTodo(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+func (h *TodoHandler) GetTodo(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
-		http.Error(w, "invalid id. ID Must be an integer", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
 		return
 	}
 
 	todo, err := h.service.GetById(id)
 	if err != nil {
 		log.Printf("error getting todo by id: %s", err)
-		http.Error(w, "todo not found", http.StatusNotFound)
+		c.JSON(http.StatusNotFound, gin.H{"error": "todo not found"})
 		return
 	}
 
-	helpers.WriteJson(w, http.StatusOK, todo)
+	c.JSON(http.StatusOK, todo)
 }
 
 // Create a new todo item and return it in JSON format.
-func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
+func (h *TodoHandler) CreateTodo(c *gin.Context) {
 	var req CreateTodoRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		log.Printf("error decoding json: %s", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	if req.Title == "" {
 		log.Printf("error: title is required")
-		http.Error(w, "title is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title is required"})
 		return
 	}
 
 	todo, err := h.service.Create(req.Title)
 	if err != nil {
 		log.Printf("error creating todo: %s", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error creating todo"})
 		return
 	}
 
-	helpers.WriteJson(w, http.StatusCreated, todo)
+	c.JSON(http.StatusCreated, todo)
+}
+
+func (h *TodoHandler) ToggleTodoState(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		log.Print("id invalid. Must be an integeger")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
+		return
+	}
+
+	_, err = h.service.GetById(id)
+	if err != nil {
+		log.Printf("error getting todo by id: %s", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "todo not found"})
+		return
+	}
+
+	response, err := h.service.Patch(id)
+	if err != nil {
+		log.Printf("error updating todo: %s", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error updating todo"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"updated": response})
+
 }
 
 type PatchTodoRequest struct {
@@ -94,24 +124,25 @@ type PatchTodoRequest struct {
 }
 
 // UpdateTodo handles the PATCH /todos/{id} endpoint and updates a todo item.
-func (h *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+func (h *TodoHandler) UpdateTodo(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
-		http.Error(w, "invalid id. ID Must be an integer", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
 		return
 	}
 
 	var req PatchTodoRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		log.Printf("error decoding json: %s", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
 	if req.Title == "" {
-		log.Printf("error: title is required")
-		http.Error(w, "title is required", http.StatusBadRequest)
+		log.Print("error: title is required")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title is required"})
 		return
 	}
 
@@ -120,26 +151,26 @@ func (h *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	_, err = h.service.GetById(id)
 	if err != nil {
 		log.Printf("error getting todo by id: %s", err)
-		http.Error(w, "todo not found", http.StatusNotFound)
+		c.JSON(http.StatusNotFound, gin.H{"error": "todo not found"})
 		return
 	}
 
 	response, err := h.service.Update(id, Todo{ID: id, Title: req.Title, Done: req.Done})
 	if err != nil {
 		log.Printf("error updating todo: %s", err)
-		http.Error(w, "error updating todo", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error updating todo"})
 		return
 	}
 
-	helpers.WriteJson(w, http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{"updated": response})
 }
 
 // DestroyTodo handles the DELETE /todos/{id} endpoint and
-func (h *TodoHandler) DestroyTodo(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.PathValue("id"))
+func (h *TodoHandler) DestroyTodo(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
-		http.Error(w, "invalid id. ID Must be an integer", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
 		return
 	}
 
@@ -156,5 +187,5 @@ func (h *TodoHandler) DestroyTodo(w http.ResponseWriter, r *http.Request) {
 
 	response := DeletedResponse{Deleted: todo}
 
-	helpers.WriteJson(w, http.StatusOK, response)
+	c.JSON(http.StatusOK, response)
 }
