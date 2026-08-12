@@ -1,189 +1,310 @@
 package todo
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetAll(t *testing.T) {
-	s := NewTodoService()
-	todos, err := s.GetAll()
-
-	assert.Nil(t, err, "getAll should not return an error")
-	assert.Len(t, todos, 2, "getAll should return 2 todos")
-	assert.Equal(t, "Learn net/http", todos[0].Title, "First todo title should be 'Learn net/http'")
+// mockStore implements TodoStorer for testing.
+// Each field is a function so individual tests can control exactly what the store returns.
+type mockStore struct {
+	getAllFn   func() ([]Todo, error)
+	getByIdFn func(id int64) (*Todo, error)
+	createFn  func(title string) (*Todo, error)
+	updateFn  func(id int64, updatedTodo Todo) (*Todo, error)
+	patchFn   func(id int64) (*Todo, error)
+	destroyFn func(id int64) error
 }
 
-func TestGetByID(t *testing.T) {
+func (m *mockStore) GetAll() ([]Todo, error)                        { return m.getAllFn() }
+func (m *mockStore) GetById(id int64) (*Todo, error)                { return m.getByIdFn(id) }
+func (m *mockStore) Create(title string) (*Todo, error)             { return m.createFn(title) }
+func (m *mockStore) Update(id int64, t Todo) (*Todo, error)         { return m.updateFn(id, t) }
+func (m *mockStore) Patch(id int64) (*Todo, error)                  { return m.patchFn(id) }
+func (m *mockStore) Destroy(id int64) error                         { return m.destroyFn(id) }
+
+// --- GetAll ---
+
+func TestGetAll(t *testing.T) {
+	store := &mockStore{
+		getAllFn: func() ([]Todo, error) {
+			return []Todo{
+				{ID: 1, Title: "Learn net/http", Done: false},
+				{ID: 2, Title: "Learn JSON encoding", Done: false},
+			}, nil
+		},
+	}
+	svc := NewTodoService(store)
+
+	todos, err := svc.GetAll()
+
+	assert.Nil(t, err)
+	assert.Len(t, todos, 2)
+	assert.Equal(t, "Learn net/http", todos[0].Title)
+}
+
+func TestGetAll_StoreError(t *testing.T) {
+	store := &mockStore{
+		getAllFn: func() ([]Todo, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	svc := NewTodoService(store)
+
+	todos, err := svc.GetAll()
+
+	assert.NotNil(t, err)
+	assert.Nil(t, todos)
+}
+
+// --- GetById ---
+
+func TestGetById(t *testing.T) {
 	tests := []struct {
-		name    string // description of this test case
-		id      int
-		wantErr bool
+		name       string
+		id         int64
+		storeTodo  *Todo
+		storeErr   error
+		wantErr    bool
+		wantErrVal error
 	}{
 		{
-			name:    "existing todo",
-			id:      1,
-			wantErr: false,
+			name:      "existing todo",
+			id:        1,
+			storeTodo: &Todo{ID: 1, Title: "Learn net/http", Done: false},
+			storeErr:  nil,
+			wantErr:   false,
 		},
 		{
-			name:    "non-existing todo",
-			id:      999,
-			wantErr: true,
+			name:       "non-existing todo",
+			id:         999,
+			storeTodo:  nil,
+			storeErr:   ErrNotFound,
+			wantErr:    true,
+			wantErrVal: ErrNotFound,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewTodoService()
-			todo, err := s.GetById(tt.id)
+			store := &mockStore{
+				getByIdFn: func(id int64) (*Todo, error) {
+					return tt.storeTodo, tt.storeErr
+				},
+			}
+			svc := NewTodoService(store)
+
+			todo, err := svc.GetById(tt.id)
+
 			if tt.wantErr {
 				assert.NotNil(t, err)
-				assert.Equal(t, ErrNotFound, err)
+				assert.Equal(t, tt.wantErrVal, err)
 			} else {
-				assert.Nil(t, err, "getByID should not return an error")
+				assert.Nil(t, err)
 				assert.Equal(t, tt.id, todo.ID)
 			}
 		})
 	}
 }
 
-func Test_create(t *testing.T) {
+// --- Create ---
+
+func TestCreate(t *testing.T) {
 	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
-		todoTitle string
+		name      string
+		title     string
+		storeTodo *Todo
+		storeErr  error
 		wantErr   bool
 	}{
 		{
-			todoTitle: "New Todo",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := NewTodoService()
-			assert.Len(t, s.Todos, 2, "Initial number of todos should be 2")
-			todo, err := s.Create(tt.todoTitle)
-			assert.Nil(t, err, "create should not return an error")
-			assert.Equal(t, tt.todoTitle, todo.Title)
-			assert.False(t, todo.Done, "Newly created todo should not be done")
-		})
-	}
-}
-
-func TestCreateTodoIncrementsID(t *testing.T) {
-	// Create a new todo and check if the ID is incremented correctly.
-	s := NewTodoService()
-	newTodo, err := s.Create("Another Todo")
-	assert.Nil(t, err, "create should not return an error")
-	assert.Equal(t, 3, newTodo.ID, "Newly created todo should have ID 3")
-	todos, _ := s.GetAll()
-	assert.Len(t, todos, 3, "There should now be 3 todos in total")
-}
-
-func TestDestroy(t *testing.T) {
-	s := NewTodoService()
-	err := s.Destroy(1)
-	assert.Nil(t, err)
-	assert.Len(t, s.Todos, 1)
-}
-
-func Test_todoService_Update(t *testing.T) {
-	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
-		id          int
-		updatedTodo Todo
-		want        Todo
-		wantErr     bool
-	}{
-		// TODO: Add test cases.
-		{
-			name: "update existing todo",
-			id:   1,
-			updatedTodo: Todo{
-				Title: "Updated Title",
-				Done:  true,
-			},
-			want: Todo{
-				ID:    1,
-				Title: "Updated Title",
-				Done:  true,
-			},
-			wantErr: false,
+			name:      "successful create",
+			title:     "New Todo",
+			storeTodo: &Todo{ID: 1, Title: "New Todo", Done: false},
+			storeErr:  nil,
+			wantErr:   false,
 		},
 		{
-			name: "update non-existing todo",
-			id:   999,
-			updatedTodo: Todo{
-				Title: "Updated Title",
-				Done:  true,
-			},
-			wantErr: true,
+			name:      "store returns error",
+			title:     "New Todo",
+			storeTodo: nil,
+			storeErr:  errors.New("db error"),
+			wantErr:   true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewTodoService()
-			got, gotErr := s.Update(tt.id, tt.updatedTodo)
+			store := &mockStore{
+				createFn: func(title string) (*Todo, error) {
+					return tt.storeTodo, tt.storeErr
+				},
+			}
+			svc := NewTodoService(store)
+
+			todo, err := svc.Create(tt.title)
+
 			if tt.wantErr {
-				assert.NotNil(t, gotErr)
-				assert.Equal(t, ErrNotFound, gotErr)
+				assert.NotNil(t, err)
 			} else {
-				assert.Nil(t, gotErr)
-				assert.Equal(t, tt.want, got)
+				assert.Nil(t, err)
+				assert.Equal(t, tt.title, todo.Title)
+				assert.False(t, todo.Done)
 			}
 		})
 	}
 }
 
-func Test_todoService_Patch(t *testing.T) {
+// --- Update ---
+
+func TestUpdate(t *testing.T) {
 	tests := []struct {
-		name    string // Name of the test
-		id      int
-		want    Todo
-		wantErr bool
+		name        string
+		id          int64
+		updatedTodo Todo
+		storeTodo   *Todo
+		storeErr    error
+		wantErr     bool
 	}{
 		{
-			name: "Toggle status to true",
+			name: "update existing todo",
 			id:   1,
-			want: Todo{
-				ID:    1,
-				Title: "Test Todo Not Done",
-				Done:  true,
-			},
-			wantErr: false,
+			updatedTodo: Todo{Title: "Updated Title", Done: true},
+			storeTodo:   &Todo{ID: 1, Title: "Updated Title", Done: true},
+			storeErr:    nil,
+			wantErr:     false,
 		},
 		{
-			name: "Test Todo Is Done",
-			id:   2,
-			want: Todo{
-				ID:    2,
-				Title: "Test Todo Is Done",
-				Done:  false,
-			},
-			wantErr: false,
-		},
-		{
-			name:    "Todo doesn't exist",
-			id:      3,
-			want:    Todo{},
-			wantErr: true,
+			name:        "update non-existing todo",
+			id:          999,
+			updatedTodo: Todo{Title: "Updated Title"},
+			storeTodo:   nil,
+			storeErr:    ErrNotFound,
+			wantErr:     true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &todoService{Todos: []Todo{
-				{ID: 1, Title: "Test Todo Not Done", Done: false},
-				{ID: 2, Title: "Test Todo Is Done", Done: true},
-			}}
-			got, gotErr := s.Patch(tt.id)
+			store := &mockStore{
+				updateFn: func(id int64, t Todo) (*Todo, error) {
+					return tt.storeTodo, tt.storeErr
+				},
+			}
+			svc := NewTodoService(store)
+
+			got, err := svc.Update(tt.id, tt.updatedTodo)
+
 			if tt.wantErr {
-				assert.NotNil(t, gotErr)
-				assert.Equal(t, ErrNotFound, gotErr)
+				assert.NotNil(t, err)
+				assert.Equal(t, ErrNotFound, err)
 			} else {
-				assert.Nil(t, gotErr)
-				assert.Equal(t, tt.want, got)
+				assert.Nil(t, err)
+				assert.Equal(t, tt.updatedTodo.Title, got.Title)
+				assert.Equal(t, tt.updatedTodo.Done, got.Done)
+			}
+		})
+	}
+}
+
+// --- Patch (toggle done) ---
+
+func TestPatch(t *testing.T) {
+	tests := []struct {
+		name       string
+		id         int64
+		storeTodo  *Todo
+		storeErr   error
+		wantDone   bool
+		wantErr    bool
+	}{
+		{
+			name:      "toggle false to true",
+			id:        1,
+			storeTodo: &Todo{ID: 1, Title: "Test Todo", Done: true},
+			storeErr:  nil,
+			wantDone:  true,
+			wantErr:   false,
+		},
+		{
+			name:      "toggle true to false",
+			id:        2,
+			storeTodo: &Todo{ID: 2, Title: "Done Todo", Done: false},
+			storeErr:  nil,
+			wantDone:  false,
+			wantErr:   false,
+		},
+		{
+			name:      "non-existing todo",
+			id:        99,
+			storeTodo: nil,
+			storeErr:  ErrNotFound,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &mockStore{
+				patchFn: func(id int64) (*Todo, error) {
+					return tt.storeTodo, tt.storeErr
+				},
+			}
+			svc := NewTodoService(store)
+
+			got, err := svc.Patch(tt.id)
+
+			if tt.wantErr {
+				assert.NotNil(t, err)
+				assert.Equal(t, ErrNotFound, err)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, tt.wantDone, got.Done)
+			}
+		})
+	}
+}
+
+// --- Destroy ---
+
+func TestDestroy(t *testing.T) {
+	tests := []struct {
+		name     string
+		id       int64
+		storeErr error
+		wantErr  bool
+	}{
+		{
+			name:     "delete existing todo",
+			id:       1,
+			storeErr: nil,
+			wantErr:  false,
+		},
+		{
+			name:     "delete non-existing todo",
+			id:       999,
+			storeErr: ErrNotFound,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &mockStore{
+				destroyFn: func(id int64) error {
+					return tt.storeErr
+				},
+			}
+			svc := NewTodoService(store)
+
+			err := svc.Destroy(tt.id)
+
+			if tt.wantErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
 			}
 		})
 	}

@@ -1,11 +1,14 @@
 package todo
 
 import (
+	"database/sql"
+
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(r *gin.Engine) {
-	svc := NewTodoService()
+func RegisterRoutes(r *gin.Engine, db *sql.DB) {
+	store := NewTodoStore(db)
+	svc := NewTodoService(store)
 	handler := NewTodoHandler(svc)
 	r.GET("/todos/", handler.GetTodos)
 	r.GET("/todos/:id", handler.GetTodo)

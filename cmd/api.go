@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"time"
@@ -12,12 +13,13 @@ import (
 
 type application struct {
 	port string
+	db   *sql.DB
 }
 
 func (app *application) mount() http.Handler {
 	r := gin.Default()
 
-	todo.RegisterRoutes(r)
+	todo.RegisterRoutes(r, app.db)
 
 	return r
 }

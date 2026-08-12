@@ -18,11 +18,11 @@ type TodoHandler struct {
 // the service to have access to the functions.
 type TodoService interface {
 	GetAll() ([]Todo, error)
-	GetById(id int) (Todo, error)
+	GetById(id int64) (Todo, error)
 	Create(todoTitle string) (Todo, error)
-	Update(id int, updatedTodo Todo) (Todo, error)
-	Patch(id int) (Todo, error)
-	Destroy(id int) error
+	Update(id int64, updatedTodo Todo) (Todo, error)
+	Patch(id int64) (Todo, error)
+	Destroy(id int64) error
 }
 
 func NewTodoHandler(service TodoService) *TodoHandler {
@@ -49,7 +49,7 @@ type CreateTodoRequest struct {
 
 // Get a single todo item by ID and return it in JSON format.
 func (h *TodoHandler) GetTodo(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
@@ -93,7 +93,7 @@ func (h *TodoHandler) CreateTodo(c *gin.Context) {
 }
 
 func (h *TodoHandler) ToggleTodoState(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
@@ -125,7 +125,7 @@ type PatchTodoRequest struct {
 
 // UpdateTodo handles the PATCH /todos/{id} endpoint and updates a todo item.
 func (h *TodoHandler) UpdateTodo(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
@@ -167,7 +167,7 @@ func (h *TodoHandler) UpdateTodo(c *gin.Context) {
 
 // DestroyTodo handles the DELETE /todos/{id} endpoint and
 func (h *TodoHandler) DestroyTodo(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
