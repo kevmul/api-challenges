@@ -18,9 +18,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	api := application{
+	api := Application{
 		port: ":8080",
-		db:   db,
+		DB:   db,
 	}
 
 	// Mount the API

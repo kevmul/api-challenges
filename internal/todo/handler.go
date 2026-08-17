@@ -1,7 +1,6 @@
 package todo
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -49,7 +48,7 @@ type CreateTodoRequest struct {
 
 // Get a single todo item by ID and return it in JSON format.
 func (h *TodoHandler) GetTodo(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
@@ -70,7 +69,7 @@ func (h *TodoHandler) GetTodo(c *gin.Context) {
 func (h *TodoHandler) CreateTodo(c *gin.Context) {
 	var req CreateTodoRequest
 
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Printf("error decoding json: %s", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -93,7 +92,7 @@ func (h *TodoHandler) CreateTodo(c *gin.Context) {
 }
 
 func (h *TodoHandler) ToggleTodoState(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
@@ -123,9 +122,9 @@ type PatchTodoRequest struct {
 	Done  bool   `json:"done"`
 }
 
-// UpdateTodo handles the PATCH /todos/{id} endpoint and updates a todo item.
+// UpdateTodo handles the PUT /todos/{id} endpoint and updates a todo item.
 func (h *TodoHandler) UpdateTodo(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
@@ -134,7 +133,7 @@ func (h *TodoHandler) UpdateTodo(c *gin.Context) {
 
 	var req PatchTodoRequest
 
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Printf("error decoding json: %s", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -167,18 +166,25 @@ func (h *TodoHandler) UpdateTodo(c *gin.Context) {
 
 // DestroyTodo handles the DELETE /todos/{id} endpoint and
 func (h *TodoHandler) DestroyTodo(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 32)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		log.Print("id invalid. Must be an integeger")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id. ID Must be an integer"})
 		return
 	}
 
-	todo, _ := h.service.GetById(id)
+	todo, err := h.service.GetById(id)
+	if err != nil {
+		log.Printf("todo not found")
+		c.JSON(http.StatusNotFound, gin.H{"error": "todo not found"})
+		return
+	}
 
 	err = h.service.Destroy(id)
 	if err != nil {
 		log.Printf("could not delete todo: %s", todo.Title)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete todo"})
+		return
 	}
 
 	type DeletedResponse struct {

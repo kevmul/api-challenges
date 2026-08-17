@@ -11,20 +11,20 @@ import (
 	"api-challenges/internal/todo"
 )
 
-type application struct {
+type Application struct {
 	port string
-	db   *sql.DB
+	DB   *sql.DB
 }
 
-func (app *application) mount() http.Handler {
+func (app *Application) mount() http.Handler {
 	r := gin.Default()
 
-	todo.RegisterRoutes(r, app.db)
+	todo.RegisterRoutes(r, app.DB)
 
 	return r
 }
 
-func (app *application) serve(h http.Handler) error {
+func (app *Application) serve(h http.Handler) error {
 	srv := &http.Server{
 		Addr:              app.port,
 		Handler:           h,

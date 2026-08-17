@@ -2,22 +2,23 @@ package todo
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
 type TodoStore struct {
-	db *sql.DB
+	DB *sql.DB
 }
 
 func NewTodoStore(db *sql.DB) *TodoStore {
-	return &TodoStore{db: db}
+	return &TodoStore{DB: db}
 }
 
 func (s *TodoStore) Create(title string) (*Todo, error) {
-	query := `INSERT INTO todos (title, done, created_at) VALUES (?, ?, ?)`
+	query := `INSERT INTO todos (title, done, created_at, updated_at) VALUES (?, ?, ?, ?)`
 	now := time.Now()
 
-	result, err := s.db.Exec(query, title, false, now, now)
+	result, err := s.DB.Exec(query, title, false, now, now)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func (s *TodoStore) Create(title string) (*Todo, error) {
 }
 
 func (s *TodoStore) GetAll() ([]Todo, error) {
-	rows, err := s.db.Query(`SELECT id, title, done, created_at, updated_at FROM todos`)
+	rows, err := s.DB.Query(`SELECT id, title, done, created_at, updated_at FROM todos`)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func (s *TodoStore) GetAll() ([]Todo, error) {
 
 func (s *TodoStore) GetById(id int64) (*Todo, error) {
 	var t Todo
-	err := s.db.QueryRow(`SELECT id, title, done, created_at, updated_at FROM todos WHERE id = ?`, id).
+	err := s.DB.QueryRow(`SELECT id, title, done, created_at, updated_at FROM todos WHERE id = ?`, id).
 		Scan(&t.ID, &t.Title, &t.Done, &t.CreatedAt, &t.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
@@ -69,19 +70,28 @@ func (s *TodoStore) GetById(id int64) (*Todo, error) {
 
 func (s *TodoStore) Update(id int64, updated Todo) (*Todo, error) {
 	now := time.Now().UTC()
-	_, err := s.db.Exec(
+	result, err := s.DB.Exec(
 		`UPDATE todos SET title = ?, done = ?, updated_at = ? WHERE id = ?`,
 		updated.Title, updated.Done, now, id,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if rows == 0 {
+		return nil, errors.New("no rows affected")
+	}
+
 	return s.GetById(id)
 }
 
 func (s *TodoStore) Patch(id int64) (*Todo, error) {
 	now := time.Now().UTC()
-	_, err := s.db.Exec(
+	_, err := s.DB.Exec(
 		`UPDATE todos SET done = NOT done, updated_at = ? WHERE id = ?`,
 		now, id,
 	)
@@ -92,6 +102,16 @@ func (s *TodoStore) Patch(id int64) (*Todo, error) {
 }
 
 func (s *TodoStore) Destroy(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM todos WHERE id = ?`, id)
-	return err
+	result, err := s.DB.Exec(`DELETE FROM todos WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
